@@ -31,7 +31,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // set the toolbar
+        // Set the toolbar
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
         setSupportActionBar(toolbar)
 
@@ -39,11 +39,11 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
 
         // Add the hamburger menu icon
         val toggle = ActionBarDrawerToggle(
-                this,
-                drawer,
-                toolbar,
-                R.string.navigation_drawer_open,
-                R.string.navigation_drawer_close
+            this,
+            drawer,
+            toolbar,
+            R.string.navigation_drawer_open,
+            R.string.navigation_drawer_close
         )
         drawer.addDrawerListener(toggle)
         toggle.syncState()
@@ -79,9 +79,18 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         }
     }
 
-    override fun onNavigationItemSelected(p0: MenuItem): Boolean {
-        // TEMPORARY
-        return false
+    override fun onNavigationItemSelected(menuItem: MenuItem): Boolean {
+        // Load the fragment that corresponds to the selected item
+        when (menuItem.itemId) {
+            R.id.nav_home -> openHomeFragment(userName)
+            R.id.nav_calendar -> openCalendarFragment()
+            R.id.nav_signin -> signIn()
+            R.id.nav_signout -> signOut()
+        }
+
+        drawer.closeDrawer(GravityCompat.START)
+
+        return true
     }
 
     override fun onBackPressed() {
@@ -112,8 +121,43 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
             findItem(R.id.nav_signout).isVisible = isSignedIn
         }
 
+        // For testing
+        userName = if (isSignedIn) "Megan Bowen" else "Please sign in"
+        userEmail = if (isSignedIn) "meganb@contoso.com" else ""
+
         // Set the user name and email in the nav drawer
-        findViewById<TextView>(R.id.user_name).text = if (isSignedIn) "Megan Bowen" else userName
-        findViewById<TextView>(R.id.user_email).text = if (isSignedIn) "meganb@contoso.com" else userEmail
+        headerView.apply {
+            findViewById<TextView>(R.id.user_name).text = userName
+            findViewById<TextView>(R.id.user_email).text = userEmail
+        }
+    }
+
+    // Load the "Home" fragment
+    private fun openHomeFragment(userName: String) {
+        val fragment = HomeFragment.createInstance(userName)
+        supportFragmentManager
+            .beginTransaction()
+            .replace(R.id.fragment_container, fragment)
+            .commit()
+        navigationView.setCheckedItem(R.id.nav_home)
+    }
+
+    // Load the "Calendar" fragment
+    private fun openCalendarFragment() {
+        supportFragmentManager
+            .beginTransaction()
+            .replace(R.id.fragment_container, CalendarFragment())
+            .commit()
+        navigationView.setCheckedItem(R.id.nav_calendar)
+    }
+
+    private fun signIn() {
+        setSignedInState(true)
+        openHomeFragment(userName)
+    }
+
+    private fun signOut() {
+        setSignedInState(false)
+        openHomeFragment(userName)
     }
 }
