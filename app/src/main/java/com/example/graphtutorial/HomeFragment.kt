@@ -7,14 +7,14 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.fragment.app.Fragment
 
-private const val USER_NAME = "userName"
+private const val ARG_USER_NAME = "userName"
 
 class HomeFragment : Fragment() {
 
     companion object {
         fun createInstance(userName: String): HomeFragment {
             val args = Bundle().apply {
-                putString(USER_NAME, userName)
+                putString(ARG_USER_NAME, userName)
             }
 
             return HomeFragment().apply {
@@ -28,13 +28,10 @@ class HomeFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        val homeView = inflater.inflate(R.layout.fragment_home, container, false)
-
-        arguments?.let {
+        return inflater.inflate(R.layout.fragment_home, container, false)?.apply {
             // Replace the "Please sign in" with the userName
-            homeView.findViewById<TextView>(R.id.home_page_username).text = it.getString(USER_NAME)
+            findViewById<TextView>(R.id.home_page_username).text =
+                arguments?.getString(ARG_USER_NAME)
         }
-
-        return homeView
     }
 }

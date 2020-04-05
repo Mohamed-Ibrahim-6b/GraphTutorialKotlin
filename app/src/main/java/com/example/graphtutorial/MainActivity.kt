@@ -1,6 +1,7 @@
 package com.example.graphtutorial
 
 import android.os.Bundle
+import android.util.Log
 import android.view.MenuItem
 import android.view.View
 import android.widget.FrameLayout
@@ -12,6 +13,15 @@ import androidx.appcompat.widget.Toolbar
 import androidx.core.view.GravityCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import com.google.android.material.navigation.NavigationView
+import com.microsoft.graph.concurrency.ICallback
+import com.microsoft.graph.core.ClientException
+import com.microsoft.graph.models.extensions.User
+import com.microsoft.identity.client.AuthenticationCallback
+import com.microsoft.identity.client.IAuthenticationResult
+import com.microsoft.identity.client.exception.MsalClientException
+import com.microsoft.identity.client.exception.MsalException
+import com.microsoft.identity.client.exception.MsalServiceException
+import com.microsoft.identity.client.exception.MsalUiRequiredException
 
 private const val SAVED_IS_SIGNED_IN = "isSignedIn"
 private const val SAVED_USER_NAME = "userName"
@@ -26,6 +36,9 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     private var isSignedIn = false
     private var userName: String = "Please sign in"
     private var userEmail: String = ""
+
+    private var authHelper: AuthenticationHelper? = null
+    private var attemptInteractiveSignIn: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,9 +70,13 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         // Listen for item select events on menu
         navigationView.setNavigationItemSelectedListener(this)
 
+        // Get the authentication helper
+        authHelper = AuthenticationHelper.getInstance(applicationContext)
+
         if (savedInstanceState == null) {
             // Load the home fragment by default on startup
             openHomeFragment(userName)
+            doSilentSignIn()
         } else {
             // Restore state
             savedInstanceState.apply {
@@ -67,7 +84,9 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
                 userName = get(SAVED_USER_NAME).toString()
                 userEmail = get(SAVED_USER_EMAIL).toString()
             }
+            setSignedInState(isSignedIn)
         }
+        attemptInteractiveSignIn = true
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -101,12 +120,12 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         }
     }
 
-    fun showProgressBar() {
+    private fun showProgressBar() {
         findViewById<FrameLayout>(R.id.fragment_container).visibility = View.GONE
         findViewById<ProgressBar>(R.id.progressbar).visibility = View.VISIBLE
     }
 
-    fun hideProgressBar() {
+    private fun hideProgressBar() {
         findViewById<FrameLayout>(R.id.fragment_container).visibility = View.VISIBLE
         findViewById<ProgressBar>(R.id.progressbar).visibility = View.GONE
     }
@@ -121,9 +140,13 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
             findItem(R.id.nav_signout).isVisible = isSignedIn
         }
 
-        // For testing
-        userName = if (isSignedIn) "Megan Bowen" else "Please sign in"
-        userEmail = if (isSignedIn) "meganb@contoso.com" else ""
+        if (isSignedIn) {
+            //userName = "Megan Bowen"
+            //userEmail = "meganb@contoso.com"
+        } else {
+            userName = "Please sign in"
+            userEmail = ""
+        }
 
         // Set the user name and email in the nav drawer
         headerView.apply {
@@ -152,12 +175,87 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
     }
 
     private fun signIn() {
-        setSignedInState(true)
-        openHomeFragment(userName)
+        showProgressBar()
+        // Attempt silent sign in first
+        // if this fails, the callback will handle doing
+        // interactive sign in
+        doSilentSignIn()
     }
 
     private fun signOut() {
+        authHelper!!.signOut()
+
         setSignedInState(false)
         openHomeFragment(userName)
+    }
+
+    // Silently sign in - used if there is already a
+    // user account in the MSAL cache
+    private fun doSilentSignIn() = authHelper!!.acquireTokenSilently(getAuthCallback())
+
+    // Prompt the user to sign in
+    private fun doInteractiveSignIn() =
+        authHelper!!.acquireTokenInteractively(this, getAuthCallback())
+
+    // Handles the authentication result
+    fun getAuthCallback(): AuthenticationCallback = object : AuthenticationCallback {
+        override fun onSuccess(authenticationResult: IAuthenticationResult?) {
+            // Log the token for debug purposes
+            val accessToken = authenticationResult?.accessToken
+            Log.d("AUTH", String.format("Access token: %s", accessToken))
+
+            // Get Graph client and get user
+            GraphHelper.getInstance().getUser(accessToken!!, getUserCallback())
+        }
+
+        override fun onCancel() {
+            // User canceled the authentication
+            Log.d("AUTH", "Authentication canceled")
+            hideProgressBar()
+        }
+
+        override fun onError(exception: MsalException?) {
+            // Check the type of exception and handle appropriately
+            if (exception is MsalUiRequiredException) {
+                Log.d("AUTH", "Interactive login required")
+                if (attemptInteractiveSignIn) doInteractiveSignIn()
+            } else if (exception is MsalClientException) {
+                if (exception.errorCode == "no_current_account") {
+                    Log.d("AUTH", "No current account, interactive login required")
+                    if (attemptInteractiveSignIn) doInteractiveSignIn()
+                } else {
+                    // Exception inside MSAL, more info inside MsalError.java
+                    Log.e("AUTH", "Client error authenticating", exception)
+                }
+            } else if (exception is MsalServiceException) {
+                // Exception when communicating with the auth server, likely config issue
+                Log.e("AUTH", "Service error authenticating", exception)
+            }
+            hideProgressBar()
+        }
+    }
+
+    private fun getUserCallback(): ICallback<User> = object : ICallback<User> {
+        override fun success(result: User?) {
+            result?.apply {
+                Log.d("AUTH", "User: $displayName")
+                userName = displayName
+                userEmail = mail ?: userPrincipalName
+            }
+            updateUI()
+        }
+
+        override fun failure(ex: ClientException?) {
+            Log.e("AUTH", "Error getting /me", ex)
+            userName = "ERROR"
+            userEmail = "ERROR"
+            updateUI()
+        }
+
+        private fun updateUI() = runOnUiThread {
+            hideProgressBar()
+            setSignedInState(true)
+            openHomeFragment(userName)
+        }
     }
 }
