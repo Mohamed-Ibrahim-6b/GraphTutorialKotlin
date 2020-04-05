@@ -2,7 +2,6 @@ package com.example.graphtutorial
 
 import android.os.Bundle
 import android.util.Log
-import android.view.MenuItem
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.ProgressBar
@@ -27,7 +26,7 @@ private const val SAVED_IS_SIGNED_IN = "isSignedIn"
 private const val SAVED_USER_NAME = "userName"
 private const val SAVED_USER_EMAIL = "userEmail"
 
-class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelectedListener {
+class MainActivity : AppCompatActivity() {
 
     private lateinit var drawer: DrawerLayout
     private lateinit var navigationView: NavigationView
@@ -45,30 +44,45 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         setContentView(R.layout.activity_main)
 
         // Set the toolbar
-        val toolbar = findViewById<Toolbar>(R.id.toolbar)
-        setSupportActionBar(toolbar)
+        val toolbar = findViewById<Toolbar>(R.id.toolbar).apply {
+            setSupportActionBar(this)
+        }
 
-        drawer = findViewById(R.id.drawer_layout)
-
-        // Add the hamburger menu icon
-        val toggle = ActionBarDrawerToggle(
-            this,
-            drawer,
-            toolbar,
-            R.string.navigation_drawer_open,
-            R.string.navigation_drawer_close
-        )
-        drawer.addDrawerListener(toggle)
-        toggle.syncState()
+        drawer = findViewById<DrawerLayout>(R.id.drawer_layout).apply {
+            // Add the hamburger menu icon
+            val toggle = ActionBarDrawerToggle(
+                this@MainActivity,
+                this,
+                toolbar,
+                R.string.navigation_drawer_open,
+                R.string.navigation_drawer_close
+            )
+            addDrawerListener(toggle)
+            toggle.syncState()
+        }
 
         navigationView = findViewById(R.id.nav_view)
+        navigationView.apply {
+            // Set user name and email
+            headerView = getHeaderView(0)
+            setSignedInState(isSignedIn)
 
-        // Set user name and email
-        headerView = navigationView.getHeaderView(0)
-        setSignedInState(isSignedIn)
+            // Listen for item select events on menu
+            setNavigationItemSelectedListener { menuItem ->
+                // Load the fragment that corresponds to the selected item
+                when (menuItem.itemId) {
+                    R.id.nav_home -> openHomeFragment(userName)
+                    R.id.nav_calendar -> openCalendarFragment()
+                    R.id.nav_signin -> signIn()
+                    R.id.nav_signout -> signOut()
+                }
 
-        // Listen for item select events on menu
-        navigationView.setNavigationItemSelectedListener(this)
+                drawer.closeDrawer(GravityCompat.START)
+
+                // Return true
+                true
+            }
+        }
 
         // Get the authentication helper
         authHelper = AuthenticationHelper.getInstance(applicationContext)
@@ -89,35 +103,17 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         attemptInteractiveSignIn = true
     }
 
-    override fun onSaveInstanceState(outState: Bundle) {
-        outState.apply {
-            super.onSaveInstanceState(this)
-            putBoolean(SAVED_IS_SIGNED_IN, isSignedIn)
-            putString(SAVED_USER_NAME, userName)
-            putString(SAVED_USER_EMAIL, userEmail)
-        }
+    override fun onSaveInstanceState(outState: Bundle) = with(outState) {
+        super.onSaveInstanceState(this)
+        putBoolean(SAVED_IS_SIGNED_IN, isSignedIn)
+        putString(SAVED_USER_NAME, userName)
+        putString(SAVED_USER_EMAIL, userEmail)
     }
 
-    override fun onNavigationItemSelected(menuItem: MenuItem): Boolean {
-        // Load the fragment that corresponds to the selected item
-        when (menuItem.itemId) {
-            R.id.nav_home -> openHomeFragment(userName)
-            R.id.nav_calendar -> openCalendarFragment()
-            R.id.nav_signin -> signIn()
-            R.id.nav_signout -> signOut()
-        }
-
+    override fun onBackPressed() = if (drawer.isDrawerOpen(GravityCompat.START)) {
         drawer.closeDrawer(GravityCompat.START)
-
-        return true
-    }
-
-    override fun onBackPressed() {
-        if (drawer.isDrawerOpen(GravityCompat.START)) {
-            drawer.closeDrawer(GravityCompat.START)
-        } else {
-            super.onBackPressed()
-        }
+    } else {
+        super.onBackPressed()
     }
 
     private fun showProgressBar() {
@@ -161,7 +157,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         supportFragmentManager
             .beginTransaction()
             .replace(R.id.fragment_container, fragment)
-            .commit()
+            .commitAllowingStateLoss()
         navigationView.setCheckedItem(R.id.nav_home)
     }
 
@@ -198,7 +194,7 @@ class MainActivity : AppCompatActivity(), NavigationView.OnNavigationItemSelecte
         authHelper!!.acquireTokenInteractively(this, getAuthCallback())
 
     // Handles the authentication result
-    fun getAuthCallback(): AuthenticationCallback = object : AuthenticationCallback {
+    private fun getAuthCallback(): AuthenticationCallback = object : AuthenticationCallback {
         override fun onSuccess(authenticationResult: IAuthenticationResult?) {
             // Log the token for debug purposes
             val accessToken = authenticationResult?.accessToken
