@@ -36,7 +36,8 @@ class MainActivity : AppCompatActivity() {
     private var userName: String = "Please sign in"
     private var userEmail: String = ""
 
-    private var authHelper: AuthenticationHelper? = null
+    //private var authHelper: AuthenticationHelper? = null
+    private lateinit var authHelper: AuthenticationHelper//? = null
     private var attemptInteractiveSignIn: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,11 +62,8 @@ class MainActivity : AppCompatActivity() {
             toggle.syncState()
         }
 
-        navigationView = findViewById(R.id.nav_view)
-        navigationView.apply {
-            // Set user name and email
+        navigationView = findViewById<NavigationView>(R.id.nav_view).apply {
             headerView = getHeaderView(0)
-            setSignedInState(isSignedIn)
 
             // Listen for item select events on menu
             setNavigationItemSelectedListener { menuItem ->
@@ -78,27 +76,25 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 drawer.closeDrawer(GravityCompat.START)
-
-                // Return true
                 true
             }
         }
+        // Set user name and email
+        setSignedInState(isSignedIn)
 
         // Get the authentication helper
         authHelper = AuthenticationHelper.getInstance(applicationContext)
 
-        if (savedInstanceState == null) {
+        savedInstanceState?.apply {
+            // Restore state
+            isSignedIn = getBoolean(SAVED_IS_SIGNED_IN)
+            userName = get(SAVED_USER_NAME).toString()
+            userEmail = get(SAVED_USER_EMAIL).toString()
+            setSignedInState(isSignedIn)
+        } ?: run {
             // Load the home fragment by default on startup
             openHomeFragment(userName)
             doSilentSignIn()
-        } else {
-            // Restore state
-            savedInstanceState.apply {
-                isSignedIn = getBoolean(SAVED_IS_SIGNED_IN)
-                userName = get(SAVED_USER_NAME).toString()
-                userEmail = get(SAVED_USER_EMAIL).toString()
-            }
-            setSignedInState(isSignedIn)
         }
         attemptInteractiveSignIn = true
     }
@@ -179,30 +175,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun signOut() {
-        authHelper!!.signOut()
-
+        authHelper.signOut()
         setSignedInState(false)
         openHomeFragment(userName)
     }
 
     // Silently sign in - used if there is already a
     // user account in the MSAL cache
-    private fun doSilentSignIn() = authHelper!!.acquireTokenSilently(getAuthCallback())
+    private fun doSilentSignIn() = authHelper.acquireTokenSilently(getAuthCallback())
 
     // Prompt the user to sign in
     private fun doInteractiveSignIn() =
-        authHelper!!.acquireTokenInteractively(this, getAuthCallback())
+        authHelper.acquireTokenInteractively(this, getAuthCallback())
 
     // Handles the authentication result
     private fun getAuthCallback(): AuthenticationCallback = object : AuthenticationCallback {
-        override fun onSuccess(authenticationResult: IAuthenticationResult?) {
-            // Log the token for debug purposes
-            val accessToken = authenticationResult?.accessToken
-            Log.d("AUTH", String.format("Access token: %s", accessToken))
+        override fun onSuccess(authenticationResult: IAuthenticationResult?) =
+            authenticationResult?.accessToken.let {
+                // Log the token for debug purposes
+                Log.d("AUTH", String.format("Access token: %s", it))
 
-            // Get Graph client and get user
-            GraphHelper.getInstance().getUser(accessToken!!, getUserCallback())
-        }
+                // Get Graph client and get user
+                GraphHelper.getInstance().getUser(it!!, getUserCallback())
+            }
 
         override fun onCancel() {
             // User canceled the authentication
@@ -210,20 +205,20 @@ class MainActivity : AppCompatActivity() {
             hideProgressBar()
         }
 
-        override fun onError(exception: MsalException?) {
-            // Check the type of exception and handle appropriately
-            if (exception is MsalUiRequiredException) {
+        override fun onError(exception: MsalException?) = with (exception) {
+            // Check the type of "this" exception and handle appropriately
+            if (this is MsalUiRequiredException) {
                 Log.d("AUTH", "Interactive login required")
                 if (attemptInteractiveSignIn) doInteractiveSignIn()
-            } else if (exception is MsalClientException) {
-                if (exception.errorCode == "no_current_account") {
+            } else if (this is MsalClientException) {
+                if (errorCode == "no_current_account") {
                     Log.d("AUTH", "No current account, interactive login required")
                     if (attemptInteractiveSignIn) doInteractiveSignIn()
                 } else {
                     // Exception inside MSAL, more info inside MsalError.java
                     Log.e("AUTH", "Client error authenticating", exception)
                 }
-            } else if (exception is MsalServiceException) {
+            } else if (this is MsalServiceException) {
                 // Exception when communicating with the auth server, likely config issue
                 Log.e("AUTH", "Service error authenticating", exception)
             }

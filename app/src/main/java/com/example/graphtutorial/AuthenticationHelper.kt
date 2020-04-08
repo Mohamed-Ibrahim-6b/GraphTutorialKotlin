@@ -9,8 +9,7 @@ import com.microsoft.identity.client.ISingleAccountPublicClientApplication
 import com.microsoft.identity.client.PublicClientApplication
 import com.microsoft.identity.client.exception.MsalException
 
-// Singleton class - the app only needs a single instance
-// of PublicClientApplication
+// Singleton class - the app only needs a single instance of PublicClientApplication
 class AuthenticationHelper private constructor(ctx: Context) {
 
     private var pca: ISingleAccountPublicClientApplication? = null
@@ -18,7 +17,7 @@ class AuthenticationHelper private constructor(ctx: Context) {
 
     init {
         PublicClientApplication.createSingleAccountPublicClientApplication(
-            ctx,
+            ctx.applicationContext,
             R.raw.msal_config,
             object : IPublicClientApplication.ISingleAccountApplicationCreatedListener {
                 override fun onCreated(application: ISingleAccountPublicClientApplication?) {
@@ -28,7 +27,6 @@ class AuthenticationHelper private constructor(ctx: Context) {
                 override fun onError(exception: MsalException?) {
                     Log.e("AUTHHELPER", "Error creating MSAL application", exception)
                 }
-
             })
     }
 
@@ -36,24 +34,16 @@ class AuthenticationHelper private constructor(ctx: Context) {
         private var INSTANCE: AuthenticationHelper? = null
 
         @Synchronized
-        fun getInstance(ctx: Context): AuthenticationHelper {
-            if (INSTANCE == null) {
-                INSTANCE = AuthenticationHelper(ctx)
+        fun getInstance(ctx: Context): AuthenticationHelper =
+            INSTANCE ?: AuthenticationHelper(ctx).apply {
+                INSTANCE = this
             }
 
-            return INSTANCE!!
-        }
-
-        // Version called from fragments. Does not create an
-        // instance if one doesn't exist
+        // Version called from fragments. Does not create an instance if one doesn't exist
         @Synchronized
-        fun getInstance(): AuthenticationHelper {
-            if (INSTANCE == null) {
-                throw IllegalStateException("AuthenticationHelper has not been initialized from MainActivity")
-            }
-
-            return INSTANCE!!
-        }
+        fun getInstance(): AuthenticationHelper = INSTANCE ?: throw IllegalStateException(
+            "AuthenticationHelper has not been initialized from MainActivity"
+        )
     }
 
     fun acquireTokenInteractively(activity: Activity, callback: AuthenticationCallback) =
@@ -62,6 +52,7 @@ class AuthenticationHelper private constructor(ctx: Context) {
     fun acquireTokenSilently(callback: AuthenticationCallback) = pca!!.apply {
         // Get the authority from MSAL config
         val authority = configuration.defaultAuthority.authorityURL.toString()
+        Log.d("AUTHHELPER", "acquireTokenSilently: authority=$authority")
         acquireTokenSilentAsync(scopes, authority, callback)
     }
 

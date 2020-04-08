@@ -14,56 +14,42 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.*
 
-
 class EventListAdapter(private val ctx: Context, private val resource: Int, events: List<Event>) :
     ArrayAdapter<Event>(ctx, resource, events) {
 
-    private inner class ViewHolder {
-        var subject: TextView? = null
-        var organizer: TextView? = null
-        var start: TextView? = null
-        var end: TextView? = null
-    }
-
-    private val localTimeZoneId: ZoneId = TimeZone.getDefault().toZoneId()
-
-    override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-        val event = getItem(position)
-
-        var holder = ViewHolder()
-
-        val view: View = convertView?.apply {
-            holder = tag as ViewHolder
+    override fun getView(position: Int, convertView: View?, parent: ViewGroup): View =
+        convertView?.apply {
+            (tag as ViewHolder).bind(getItem(position))
         } ?: LayoutInflater.from(ctx).inflate(resource, parent, false).apply {
-            holder.subject = findViewById(R.id.eventsubject)
-            holder.organizer = findViewById(R.id.eventorganizer)
-            holder.start = findViewById(R.id.eventstart)
-            holder.end = findViewById(R.id.eventend)
-
-            tag = holder
+            ViewHolder(this).apply {
+                tag = this
+                bind(getItem(position))
+            }
         }
 
-        event!!.apply {
-            holder.subject!!.text = subject
-            holder.organizer!!.text = organizer.emailAddress.name
-            holder.start!!.text = getLocalDateTimeString(start)
-            holder.end!!.text = getLocalDateTimeString(end)
+    private class ViewHolder(val itemView: View) {
+
+        private val localTimeZoneId: ZoneId = TimeZone.getDefault().toZoneId()
+
+        fun bind(event: Event?) = event?.apply {
+            itemView.findViewById<TextView>(R.id.eventsubject).text = subject
+            itemView.findViewById<TextView>(R.id.eventorganizer).text = organizer.emailAddress.name
+            itemView.findViewById<TextView>(R.id.eventstart).text = getLocalDateTimeString(start)
+            itemView.findViewById<TextView>(R.id.eventend).text = getLocalDateTimeString(end)
         }
 
-        return view
-    }
-
-    // Convert Graph's DateTimeTimeZone format to
-    // a LocalDateTime, then return a formatted string
-    private fun getLocalDateTimeString(dateTime: DateTimeTimeZone): String {
-        val localDateTime = LocalDateTime.parse(dateTime.dateTime)
-            .atZone(ZoneId.of(dateTime.timeZone))
-            .withZoneSameInstant(localTimeZoneId)
-
-        return String.format(
-            "%s %s",
-            localDateTime.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)),
-            localDateTime.format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))
-        )
+        // Convert Graph's DateTimeTimeZone format to
+        // a LocalDateTime, then return a formatted string
+        private fun getLocalDateTimeString(dateTime: DateTimeTimeZone): String {
+            LocalDateTime.parse(dateTime.dateTime)
+                .atZone(ZoneId.of(dateTime.timeZone))
+                .withZoneSameInstant(localTimeZoneId).apply {
+                    return String.format(
+                        "%s %s",
+                        format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)),
+                        format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT))
+                    )
+                }
+        }
     }
 }

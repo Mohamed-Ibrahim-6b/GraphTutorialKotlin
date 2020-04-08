@@ -10,30 +10,19 @@ import com.microsoft.graph.options.QueryOption
 import com.microsoft.graph.requests.extensions.GraphServiceClient
 import com.microsoft.graph.requests.extensions.IEventCollectionPage
 
-// Singleton class - the app only needs a single instance
-// of the Graph client
+// Singleton class - the app only needs a single instance of the Graph client
 class GraphHelper : IAuthenticationProvider {
 
-    private var client: IGraphServiceClient? = null
-    private var accessToken: String? = null
-
-    init {
-        client = GraphServiceClient.builder()
-            .authenticationProvider(this)
-            .buildClient()
-    }
+    private lateinit var accessToken: String
+    private var client: IGraphServiceClient = GraphServiceClient.builder()
+        .authenticationProvider(this)
+        .buildClient()
 
     companion object {
         private var INSTANCE: GraphHelper? = null
 
         @Synchronized
-        fun getInstance(): GraphHelper {
-            if (INSTANCE == null) {
-                INSTANCE = GraphHelper()
-            }
-
-            return INSTANCE!!
-        }
+        fun getInstance(): GraphHelper = INSTANCE ?: GraphHelper().apply { INSTANCE = this }
     }
 
     // Part of the Graph IAuthenticationProvider interface
@@ -47,7 +36,7 @@ class GraphHelper : IAuthenticationProvider {
         this.accessToken = accessToken
 
         // GET /me (logged in user)
-        client!!.me().buildRequest().get(callback)
+        client.me().buildRequest().get(callback)
     }
 
     fun getEvents(accessToken: String, callback: ICallback<IEventCollectionPage>) {
@@ -59,13 +48,10 @@ class GraphHelper : IAuthenticationProvider {
         }
 
         // Get /me/events
-        client!!.me().events()
-            .buildRequest(options)
-            .select("subject,organizer,start,end")
+        client.me().events().buildRequest(options).select("subject,organizer,start,end")
             .get(callback)
     }
 
-    // Debug function to get the JSON representation of a Graph
-    // object
-    fun serializeObject(obj: Any): String = client!!.serializer.serializeObject(obj)
+    // Debug function to get the JSON representation of a Graph object
+    fun serializeObject(obj: Any): String = client.serializer.serializeObject(obj)
 }

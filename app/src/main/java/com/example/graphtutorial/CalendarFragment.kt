@@ -31,8 +31,7 @@ class CalendarFragment : Fragment() {
             showProgressBar()
 
             // Get a current access token
-            AuthenticationHelper
-                .getInstance()
+            AuthenticationHelper.getInstance()
                 .acquireTokenSilently(object : AuthenticationCallback {
                     override fun onSuccess(authenticationResult: IAuthenticationResult?) {
                         GraphHelper.getInstance().apply {
@@ -52,13 +51,9 @@ class CalendarFragment : Fragment() {
         }
     }
 
-    private fun showProgressBar() = activity?.runOnUiThread {
-        progress.visibility = View.VISIBLE
-    }
+    private fun showProgressBar() = activity!!.runOnUiThread { progress.visibility = View.VISIBLE }
 
-    private fun hideProgressBar() = activity?.runOnUiThread {
-        progress.visibility = View.GONE
-    }
+    private fun hideProgressBar() = activity!!.runOnUiThread { progress.visibility = View.GONE }
 
     private fun getEventsCallback(): ICallback<IEventCollectionPage> =
         object : ICallback<IEventCollectionPage> {
@@ -67,8 +62,7 @@ class CalendarFragment : Fragment() {
                 addEventsToList()
 
                 // Temporary for debugging
-                val jsonEvents = GraphHelper.getInstance().serializeObject(eventList!!)
-                Log.d("GRAPH", jsonEvents)
+                Log.d("GRAPH", GraphHelper.getInstance().serializeObject(eventList!!))
 
                 hideProgressBar()
             }
