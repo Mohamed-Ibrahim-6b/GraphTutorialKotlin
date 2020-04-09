@@ -12,13 +12,9 @@ private const val ARG_USER_NAME = "userName"
 class HomeFragment : Fragment() {
 
     companion object {
-        fun createInstance(userName: String): HomeFragment {
-            val args = Bundle().apply {
+        fun createInstance(userName: String) = HomeFragment().apply {
+            arguments = Bundle().apply {
                 putString(ARG_USER_NAME, userName)
-            }
-
-            return HomeFragment().apply {
-                arguments = args
             }
         }
     }

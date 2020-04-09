@@ -36,8 +36,7 @@ class MainActivity : AppCompatActivity() {
     private var userName: String = "Please sign in"
     private var userEmail: String = ""
 
-    //private var authHelper: AuthenticationHelper? = null
-    private lateinit var authHelper: AuthenticationHelper//? = null
+    private lateinit var authHelper: AuthenticationHelper
     private var attemptInteractiveSignIn: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -205,7 +204,7 @@ class MainActivity : AppCompatActivity() {
             hideProgressBar()
         }
 
-        override fun onError(exception: MsalException?) = with (exception) {
+        override fun onError(exception: MsalException?) = with(exception) {
             // Check the type of "this" exception and handle appropriately
             if (this is MsalUiRequiredException) {
                 Log.d("AUTH", "Interactive login required")
